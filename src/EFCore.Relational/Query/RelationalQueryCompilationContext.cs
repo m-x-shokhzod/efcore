@@ -2,6 +2,7 @@
 // The .NET Foundation licenses this file to you under the MIT license.
 
 using System.Diagnostics.CodeAnalysis;
+using Microsoft.EntityFrameworkCore.Query.Internal;
 
 namespace Microsoft.EntityFrameworkCore.Query;
 
@@ -66,4 +67,33 @@ public class RelationalQueryCompilationContext : QueryCompilationContext
     ///     A manager for SQL aliases, capable of generate uniquified table aliases.
     /// </summary>
     public virtual SqlAliasManager SqlAliasManager { get; }
+
+    /// <inheritdoc />
+    public override Func<QueryContext, IEnumerable<TElement>> CreateEnumerableQueryExecutor<TElement>(Expression query)
+    {
+        var queryAndEventData = Logger.QueryCompilationStarting(Dependencies.Context, new ExpressionPrinter(), query);
+        var interceptedQuery = queryAndEventData.Query;
+
+        var preprocessedQuery = Dependencies.QueryTranslationPreprocessorFactory.Create(this).Process(interceptedQuery);
+        var translatedQuery = Dependencies.QueryableMethodTranslatingExpressionVisitorFactory.Create(this).Translate(preprocessedQuery);
+        var postprocessedQuery = Dependencies.QueryTranslationPostprocessorFactory.Create(this).Process(translatedQuery);
+
+        if (postprocessedQuery is ShapedQueryExpression shapedQuery)
+        {
+            // TODO: Make this into a singleton service
+            var materializerFactory = new RelationalMaterializerFactory(
+                this,
+                RelationalDependencies.MemoryCache,
+                RelationalDependencies.QuerySqlGeneratorFactory,
+                RelationalDependencies.RelationalParameterBasedSqlProcessorFactory,
+                detailedErrorsEnabled: false, // TODO: get from core singleton options
+                threadSafetyChecksEnabled: true); // TODO: get from core singleton options
+
+            return materializerFactory.CreateEnumerableMaterializer<TElement>(shapedQuery);
+        }
+
+        throw new NotImplementedException(
+            $"The non-generated materializer does not yet support this query shape (TElement={typeof(TElement).Name}, "
+            + $"postprocessed expression type: {postprocessedQuery.GetType().Name}).");
+    }
 }

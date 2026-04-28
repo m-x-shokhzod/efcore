@@ -860,4 +860,38 @@ public abstract class RelationalTypeMapping : CoreTypeMapping
     /// <returns>The expression with customization added.</returns>
     public virtual Expression CustomizeDataReaderExpression(Expression expression)
         => expression;
+
+    /// <summary>
+    ///     Reads a value from the data reader at the given ordinal, using the appropriate typed reader
+    ///     method and applying any value converter, returning the result as <c>object?</c>.
+    ///     Used for constructor arguments in anonymous type projections where boxing is necessary.
+    /// </summary>
+    public virtual object? ReadValue(DbDataReader reader, int ordinal)
+    {
+        var providerType = (Converter?.ProviderClrType ?? ClrType).UnwrapNullableType();
+
+        object? value = Type.GetTypeCode(providerType) switch
+        {
+            TypeCode.Int32 => reader.GetInt32(ordinal),
+            TypeCode.String => reader.GetString(ordinal),
+            TypeCode.Int64 => reader.GetInt64(ordinal),
+            TypeCode.Int16 => reader.GetInt16(ordinal),
+            TypeCode.Byte => reader.GetByte(ordinal),
+            TypeCode.Boolean => reader.GetBoolean(ordinal),
+            TypeCode.DateTime => reader.GetDateTime(ordinal),
+            TypeCode.Decimal => reader.GetDecimal(ordinal),
+            TypeCode.Double => reader.GetDouble(ordinal),
+            TypeCode.Single => reader.GetFloat(ordinal),
+            TypeCode.Char => reader.GetChar(ordinal),
+            _ when providerType == typeof(Guid) => reader.GetGuid(ordinal),
+            _ => reader.GetValue(ordinal)
+        };
+
+        if (Converter is { } converter)
+        {
+            value = converter.ConvertFromProvider(value);
+        }
+
+        return value;
+    }
 }

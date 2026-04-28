@@ -67,6 +67,44 @@ public class QueryCompiler : IQueryCompiler
     public virtual TResult ExecuteAsync<TResult>(Expression query, CancellationToken cancellationToken = default)
         => ExecuteCore<TResult>(query, async: true, cancellationToken);
 
+    /// <summary>
+    ///     This is an internal API that supports the Entity Framework Core infrastructure and not subject to
+    ///     the same compatibility standards as public APIs. It may be changed or removed without notice in
+    ///     any release. You should only use it directly in your code with extreme caution and knowing that
+    ///     doing so can result in application failures when updating to a new Entity Framework Core release.
+    /// </summary>
+    public virtual IEnumerable<TElement> ExecuteEnumerable<TElement>(Expression query)
+        => ExecuteEnumerableCore<TElement>(query, async: false, CancellationToken.None);
+
+    /// <summary>
+    ///     This is an internal API that supports the Entity Framework Core infrastructure and not subject to
+    ///     the same compatibility standards as public APIs. It may be changed or removed without notice in
+    ///     any release. You should only use it directly in your code with extreme caution and knowing that
+    ///     doing so can result in application failures when updating to a new Entity Framework Core release.
+    /// </summary>
+    public virtual IAsyncEnumerable<TElement> ExecuteAsyncEnumerable<TElement>(Expression query, CancellationToken cancellationToken)
+    {
+        var result = ExecuteEnumerableCore<TElement>(query, async: true, cancellationToken);
+        return (IAsyncEnumerable<TElement>)result;
+    }
+
+    private IEnumerable<TElement> ExecuteEnumerableCore<TElement>(Expression query, bool async, CancellationToken cancellationToken)
+    {
+        var queryContext = _queryContextFactory.Create();
+        queryContext.CancellationToken = cancellationToken;
+        var queryAfterExtraction = ExtractParameters(query, queryContext.Parameters, _logger);
+
+        var compiledQuery
+            = _compiledQueryCache
+                .GetOrAddQuery(
+                    _compiledQueryCacheKeyGenerator.GenerateCacheKey(queryAfterExtraction, async),
+                    () => RuntimeFeature.IsDynamicCodeSupported
+                        ? _database.CompileEnumerableQuery<TElement>(queryAfterExtraction, async)
+                        : throw new InvalidOperationException(CoreStrings.QueryNotPrecompiled));
+
+        return compiledQuery(queryContext);
+    }
+
     private TResult ExecuteCore<TResult>(Expression query, bool async, CancellationToken cancellationToken)
     {
         var queryContext = _queryContextFactory.Create();

@@ -195,6 +195,29 @@ public class QueryCompilationContext
     }
 
     /// <summary>
+    ///     Creates the query executor func for an enumerable query where <typeparamref name="TElement" /> is the
+    ///     element type directly (not wrapped in <see cref="IEnumerable{T}" /> or <see cref="IAsyncEnumerable{T}" />).
+    ///     The returned enumerable is expected to implement both <see cref="IEnumerable{T}" /> and
+    ///     <see cref="IAsyncEnumerable{T}" />.
+    /// </summary>
+    /// <typeparam name="TElement">The element type of the query result.</typeparam>
+    /// <param name="query">The query to generate executor for.</param>
+    /// <returns>Returns <see cref="Func{QueryContext, IEnumerable}" /> which can be invoked to get results of this query.</returns>
+    public virtual Func<QueryContext, IEnumerable<TElement>> CreateEnumerableQueryExecutor<TElement>(Expression query)
+    {
+        // Default implementation: delegate to the old expression-tree-based path.
+        // The returned IEnumerable<TElement> is expected to also implement IAsyncEnumerable<TElement>
+        // (SingleQueryingEnumerable<T> and InMemory's QueryingEnumerable<T> both do).
+        if (IsAsync)
+        {
+            var asyncExecutor = CreateQueryExecutor<IAsyncEnumerable<TElement>>(query);
+            return qc => (IEnumerable<TElement>)asyncExecutor(qc);
+        }
+
+        return CreateQueryExecutor<IEnumerable<TElement>>(query);
+    }
+
+    /// <summary>
     ///     Creates the query executor func which gives results for this query.
     /// </summary>
     /// <typeparam name="TResult">The result type of this query.</typeparam>
