@@ -692,6 +692,153 @@ public abstract class AdHocComplexTypeQueryTestBase(NonSharedFixture fixture)
 
     #endregion Issue38105
 
+    #region Issue31246
+
+    [ConditionalFact]
+    public virtual async Task Can_query_by_complex_type_property_with_index()
+    {
+        var contextFactory = await InitializeNonSharedTest<Context31246>(
+            seed: context =>
+            {
+                context.AddRange(
+                    new Context31246.Person { Id = 1, Address = new Context31246.Address { City = "Seattle", PostalCode = "98101" } },
+                    new Context31246.Person { Id = 2, Address = new Context31246.Address { City = "Redmond", PostalCode = "98052" } });
+                return context.SaveChangesAsync();
+            });
+
+        await using var context = contextFactory.CreateDbContext();
+
+        var found = await context.Set<Context31246.Person>().SingleAsync(p => p.Address.City == "Seattle");
+        Assert.Equal(1, found.Id);
+        Assert.Equal("98101", found.Address.PostalCode);
+    }
+
+    [ConditionalFact]
+    public virtual async Task Can_update_entity_with_index_on_complex_type_property()
+    {
+        var contextFactory = await InitializeNonSharedTest<Context31246>(
+            seed: context =>
+            {
+                context.Add(
+                    new Context31246.Person { Id = 1, Address = new Context31246.Address { City = "Seattle", PostalCode = "98101" } });
+                return context.SaveChangesAsync();
+            });
+
+        await using (var context = contextFactory.CreateDbContext())
+        {
+            var person = await context.Set<Context31246.Person>().SingleAsync();
+            person.Address.PostalCode = "98102";
+            await context.SaveChangesAsync();
+        }
+
+        await using (var context = contextFactory.CreateDbContext())
+        {
+            var person = await context.Set<Context31246.Person>().SingleAsync();
+            Assert.Equal("98102", person.Address.PostalCode);
+        }
+    }
+
+    [ConditionalFact]
+    public virtual async Task Can_delete_entity_with_index_on_complex_type_property()
+    {
+        var contextFactory = await InitializeNonSharedTest<Context31246>(
+            seed: context =>
+            {
+                context.Add(
+                    new Context31246.Person { Id = 1, Address = new Context31246.Address { City = "Seattle", PostalCode = "98101" } });
+                return context.SaveChangesAsync();
+            });
+
+        await using (var context = contextFactory.CreateDbContext())
+        {
+            var person = await context.Set<Context31246.Person>().SingleAsync();
+            context.Remove(person);
+            await context.SaveChangesAsync();
+        }
+
+        await using (var context = contextFactory.CreateDbContext())
+        {
+            Assert.Equal(0, await context.Set<Context31246.Person>().CountAsync());
+        }
+    }
+
+    [ConditionalFact]
+    public virtual async Task Can_query_by_alternate_key_on_complex_type_property()
+    {
+        var contextFactory = await InitializeNonSharedTest<Context31246>(
+            seed: context =>
+            {
+                context.AddRange(
+                    new Context31246.Person { Id = 1, Address = new Context31246.Address { City = "Seattle", PostalCode = "98101" } },
+                    new Context31246.Person { Id = 2, Address = new Context31246.Address { City = "Redmond", PostalCode = "98052" } });
+                return context.SaveChangesAsync();
+            });
+
+        await using var context = contextFactory.CreateDbContext();
+
+        var found = await context.Set<Context31246.Person>().SingleAsync(p => p.Address.City == "Redmond");
+        Assert.Equal(2, found.Id);
+    }
+
+    [ConditionalFact]
+    public virtual async Task Can_save_batch_swapping_alternate_key_values_on_complex_type_property()
+    {
+        var contextFactory = await InitializeNonSharedTest<Context31246>(
+            seed: context =>
+            {
+                context.AddRange(
+                    new Context31246.Person { Id = 1, Address = new Context31246.Address { City = "Seattle", PostalCode = "98101" } },
+                    new Context31246.Person { Id = 2, Address = new Context31246.Address { City = "Redmond", PostalCode = "98052" } });
+                return context.SaveChangesAsync();
+            });
+
+        // Update non-AK columns on multiple rows in the same batch. The CommandBatchPreparer
+        // still has to read the alternate-key column values (Address_City) for each command in
+        // order to build edges in the topological sort (AddUniqueValueEdges). This exercises
+        // ColumnAccessors -> FindColumnMapping for a complex-typed AK column, which previously
+        // returned null and surfaced as "key column 'Address_City' is 'null'".
+        await using (var context = contextFactory.CreateDbContext())
+        {
+            var people = await context.Set<Context31246.Person>().OrderBy(p => p.Id).ToListAsync();
+            people[0].Address.PostalCode = "98103";
+            people[1].Address.PostalCode = "98054";
+            await context.SaveChangesAsync();
+        }
+
+        await using (var context = contextFactory.CreateDbContext())
+        {
+            var people = await context.Set<Context31246.Person>().OrderBy(p => p.Id).ToListAsync();
+            Assert.Equal("98103", people[0].Address.PostalCode);
+            Assert.Equal("98054", people[1].Address.PostalCode);
+        }
+    }
+
+    protected class Context31246(DbContextOptions options) : DbContext(options)
+    {
+        protected override void OnModelCreating(ModelBuilder modelBuilder)
+            => modelBuilder.Entity<Person>(b =>
+            {
+                b.Property(p => p.Id).ValueGeneratedNever();
+                b.ComplexProperty(p => p.Address);
+                b.HasAlternateKey(p => p.Address.City);
+                b.HasIndex(p => p.Address.PostalCode);
+            });
+
+        public class Person
+        {
+            public int Id { get; set; }
+            public Address Address { get; set; } = null!;
+        }
+
+        public class Address
+        {
+            public string City { get; set; } = null!;
+            public string PostalCode { get; set; } = null!;
+        }
+    }
+
+    #endregion Issue31246
+
     protected override string NonSharedStoreName
         => "AdHocComplexTypeQueryTest";
 }

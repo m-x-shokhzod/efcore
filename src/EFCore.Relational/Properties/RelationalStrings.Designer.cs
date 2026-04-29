@@ -1046,6 +1046,14 @@ namespace Microsoft.EntityFrameworkCore.Diagnostics
                 value, valueType, property, propertyType, entityType);
 
         /// <summary>
+        ///     The index {indexProperties} on the entity type '{entityType}' cannot be configured because the complex property '{complexProperty}' it traverses is mapped to a different table '{complexTable}' than the entity's table '{entityTable}'. Indexes can only reference complex properties that are mapped to the same table as the declaring entity type.
+        /// </summary>
+        public static string IndexOnComplexPropertyMappedToDifferentTable(object? indexProperties, object? entityType, object? complexProperty, object? complexTable, object? entityTable)
+            => string.Format(
+                GetString("IndexOnComplexPropertyMappedToDifferentTable", nameof(indexProperties), nameof(entityType), nameof(complexProperty), nameof(complexTable), nameof(entityTable)),
+                indexProperties, entityType, complexProperty, complexTable, entityTable);
+
+        /// <summary>
         ///     The data insertion operation on '{table}' is not associated with a model. Either add a model to the migration, or specify the column types in all data operations.
         /// </summary>
         public static string InsertDataOperationNoModel(object? table)

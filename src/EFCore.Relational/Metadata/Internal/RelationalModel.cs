@@ -1839,7 +1839,8 @@ public class RelationalModel : Annotatable, IRelationalModel
                     var columns = new Column[index.Properties.Count];
                     for (var i = 0; i < columns.Length; i++)
                     {
-                        if (FindColumn(table, index.Properties[i]) is Column indexColumn)
+                        if (index.Properties[i] is IProperty primitive
+                            && FindColumn(table, primitive) is Column indexColumn)
                         {
                             columns[i] = indexColumn;
                         }
@@ -2398,7 +2399,7 @@ public class RelationalModel : Annotatable, IRelationalModel
     {
         var declaringEntityType = model.FindEntityType(declaringEntityTypeName)!;
 
-        return declaringEntityType.FindKey(properties.Select(p => declaringEntityType.FindProperty(p)!).ToArray())!;
+        return declaringEntityType.FindKey(properties.Select(p => FindPropertyByPath(declaringEntityType, p)).ToArray())!;
     }
 
     /// <summary>
@@ -2430,7 +2431,59 @@ public class RelationalModel : Annotatable, IRelationalModel
     {
         var declaringEntityType = model.FindEntityType(declaringEntityTypeName)!;
 
-        return declaringEntityType.FindIndex(properties.Select(p => declaringEntityType.FindProperty(p)!).ToArray())!;
+        return declaringEntityType.FindIndex(properties.Select(p => FindPropertyByPath(declaringEntityType, p)).ToArray())!;
+    }
+
+    /// <summary>
+    ///     This is an internal API that supports the Entity Framework Core infrastructure and not subject to
+    ///     the same compatibility standards as public APIs. It may be changed or removed without notice in
+    ///     any release. You should only use it directly in your code with extreme caution and knowing that
+    ///     doing so can result in application failures when updating to a new Entity Framework Core release.
+    /// </summary>
+    public static IProperty FindPropertyByPath(IEntityType declaringEntityType, string propertyPath)
+    {
+        if (propertyPath.IndexOf('.') < 0)
+        {
+            return declaringEntityType.FindProperty(propertyPath)!;
+        }
+
+        var segments = propertyPath.Split('.');
+        ITypeBase currentType = declaringEntityType;
+        for (var i = 0; i < segments.Length - 1; i++)
+        {
+            currentType = currentType.FindComplexProperty(segments[i])!.ComplexType;
+        }
+
+        return currentType.FindProperty(segments[^1])!;
+    }
+
+    /// <summary>
+    ///     This is an internal API that supports the Entity Framework Core infrastructure and not subject to
+    ///     the same compatibility standards as public APIs. It may be changed or removed without notice in
+    ///     any release. You should only use it directly in your code with extreme caution and knowing that
+    ///     doing so can result in application failures when updating to a new Entity Framework Core release.
+    /// </summary>
+    public static IReadOnlyProperty? FindReadOnlyPropertyByPath(IReadOnlyEntityType declaringEntityType, string propertyPath)
+    {
+        if (propertyPath.IndexOf('.') < 0)
+        {
+            return declaringEntityType.FindProperty(propertyPath);
+        }
+
+        var segments = propertyPath.Split('.');
+        IReadOnlyTypeBase currentType = declaringEntityType;
+        for (var i = 0; i < segments.Length - 1; i++)
+        {
+            var complexProperty = currentType.FindComplexProperty(segments[i]);
+            if (complexProperty == null)
+            {
+                return null;
+            }
+
+            currentType = complexProperty.ComplexType;
+        }
+
+        return currentType.FindProperty(segments[^1]);
     }
 
     /// <summary>

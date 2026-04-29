@@ -16504,6 +16504,9 @@
           "Member": "static string IncorrectDefaultValueType(object? value, object? valueType, object? property, object? propertyType, object? entityType);"
         },
         {
+          "Member": "static string IndexOnComplexPropertyMappedToDifferentTable(object? indexProperties, object? entityType, object? complexProperty, object? complexTable, object? entityTable);"
+        },
+        {
           "Member": "static string InsertDataOperationNoModel(object? table);"
         },
         {

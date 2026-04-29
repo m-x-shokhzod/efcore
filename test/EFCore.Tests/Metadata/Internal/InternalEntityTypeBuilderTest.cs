@@ -769,7 +769,7 @@ public class InternalEntityTypeBuilderTest
 
         var indexBuilder = entityBuilder.HasIndex([Order.IdProperty.Name], ConfigurationSource.Convention);
         Assert.Same(indexBuilder.Metadata.Properties.Single(), entityBuilder.Metadata.FindProperty(Order.IdProperty.Name));
-        Assert.Same(indexBuilder.Metadata, entityBuilder.Metadata.FindIndex(indexBuilder.Metadata.Properties.Single()));
+        Assert.Same(indexBuilder.Metadata, entityBuilder.Metadata.FindIndex((IReadOnlyProperty)indexBuilder.Metadata.Properties.Single()));
         Assert.Empty(derivedEntityBuilder.Metadata.GetDeclaredIndexes());
     }
 
@@ -802,7 +802,7 @@ public class InternalEntityTypeBuilderTest
 
         var indexBuilder = entityBuilder.HasIndex([Order.IdProperty.Name], ConfigurationSource.Convention);
         Assert.Same(indexBuilder.Metadata.Properties.Single(), entityBuilder.Metadata.FindProperty(Order.IdProperty.Name));
-        Assert.Same(indexBuilder.Metadata, entityBuilder.Metadata.FindIndex(indexBuilder.Metadata.Properties.Single()));
+        Assert.Same(indexBuilder.Metadata, entityBuilder.Metadata.FindIndex((IReadOnlyProperty)indexBuilder.Metadata.Properties.Single()));
         Assert.True(indexBuilder.Metadata.IsUnique);
         Assert.Empty(derivedEntityBuilder.Metadata.GetDeclaredIndexes());
     }

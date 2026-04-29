@@ -1857,6 +1857,15 @@ namespace TestNamespace
             pK_PrincipalBase.MappedKeys.Add(pK_PrincipalBaseKey);
             RelationalModel.GetOrCreateUniqueConstraints(pK_PrincipalBaseKey).Add(pK_PrincipalBase);
             principalBaseTable.UniqueConstraints.Add("PK_PrincipalBase", pK_PrincipalBase);
+            var iX_PrincipalBase_Id_Owned_Number = new TableIndex(
+            "IX_PrincipalBase_Id_Owned_Number", principalBaseTable, new[] { idColumn, owned_NumberColumn }, false);
+            iX_PrincipalBase_Id_Owned_Number.SetRowIndexValueFactory(new CompositeRowIndexValueFactory(iX_PrincipalBase_Id_Owned_Number));
+            var iX_PrincipalBase_Id_Owned_NumberIx = RelationalModel.GetIndex(this,
+                "Microsoft.EntityFrameworkCore.Scaffolding.CompiledModelTestBase+PrincipalBase",
+                "IX_PrincipalBase_Id_Owned_Number");
+            iX_PrincipalBase_Id_Owned_Number.MappedIndexes.Add(iX_PrincipalBase_Id_Owned_NumberIx);
+            RelationalModel.GetOrCreateTableIndexes(iX_PrincipalBase_Id_Owned_NumberIx).Add(iX_PrincipalBase_Id_Owned_Number);
+            principalBaseTable.Indexes.Add("IX_PrincipalBase_Id_Owned_Number", iX_PrincipalBase_Id_Owned_Number);
             var iX_PrincipalBase_PrincipalBaseId = new TableIndex(
             "IX_PrincipalBase_PrincipalBaseId", principalBaseTable, new[] { principalBaseIdColumn }, false);
             iX_PrincipalBase_PrincipalBaseId.SetRowIndexValueFactory(new SimpleRowIndexValueFactory<long>(iX_PrincipalBase_PrincipalBaseId));

@@ -67,7 +67,7 @@ public static class RelationalIndexExtensions
             .Append("IX_")
             .Append(tableName)
             .Append('_')
-            .AppendJoin(index.Properties.Select(p => p.GetColumnName()), "_")
+            .AppendJoin(index.Properties.OfType<IReadOnlyProperty>().Select(p => p.GetColumnName()), "_")
             .ToString();
 
         return Uniquifier.Truncate(baseName, index.DeclaringEntityType.Model.GetMaxIdentifierLength());
@@ -86,7 +86,7 @@ public static class RelationalIndexExtensions
             return null;
         }
 
-        var columnNames = index.Properties.GetColumnNames(storeObject);
+        var columnNames = index.Properties.OfType<IReadOnlyProperty>().ToList().GetColumnNames(storeObject);
         if (columnNames == null)
         {
             return null;
@@ -103,7 +103,7 @@ public static class RelationalIndexExtensions
                          .FindRowInternalForeignKeys(storeObject)
                          .SelectMany(fk => fk.PrincipalEntityType.GetIndexes()))
             {
-                var otherColumnNames = otherIndex.Properties.GetColumnNames(storeObject);
+                var otherColumnNames = otherIndex.Properties.OfType<IReadOnlyProperty>().ToList().GetColumnNames(storeObject);
                 if ((otherColumnNames != null)
                     && otherColumnNames.SequenceEqual(columnNames))
                 {

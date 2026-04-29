@@ -1704,6 +1704,38 @@ namespace Microsoft.EntityFrameworkCore.Diagnostics
                 method, argumentCount, parameterCount);
 
         /// <summary>
+        ///     The index {indexProperties} on the entity type '{entityType}' cannot be configured because it traverses the complex collection '{property}'. Indexes cannot reference properties whose path goes through a complex collection.
+        /// </summary>
+        public static string IndexOnComplexCollection(object? indexProperties, object? entityType, object? property)
+            => string.Format(
+                GetString("IndexOnComplexCollection", nameof(indexProperties), nameof(entityType), nameof(property)),
+                indexProperties, entityType, property);
+
+        /// <summary>
+        ///     The index {indexProperties} on the entity type '{entityType}' cannot be configured because the complex property '{property}' it traverses is configured as optional. Mark the complex property as required in order to use one of its properties as part of an index.
+        /// </summary>
+        public static string IndexOnNullableComplexProperty(object? indexProperties, object? entityType, object? property)
+            => string.Format(
+                GetString("IndexOnNullableComplexProperty", nameof(indexProperties), nameof(entityType), nameof(property)),
+                indexProperties, entityType, property);
+
+        /// <summary>
+        ///     The index property '{property}' on the entity type '{entityType}' cannot be configured because it is not a scalar property or a complex property. Only scalar properties and complex properties can be referenced by an index.
+        /// </summary>
+        public static string IndexPropertyMustBePropertyOrComplexProperty(object? property, object? entityType)
+            => string.Format(
+                GetString("IndexPropertyMustBePropertyOrComplexProperty", nameof(property), nameof(entityType)),
+                property, entityType);
+
+        /// <summary>
+        ///     The composite index {indexProperties} on the entity type '{entityType}' cannot be configured because it includes the complex property '{property}'. A complex property can only appear as the sole property of an index.
+        /// </summary>
+        public static string CompositeIndexOnComplexProperty(object? indexProperties, object? entityType, object? property)
+            => string.Format(
+                GetString("CompositeIndexOnComplexProperty", nameof(indexProperties), nameof(entityType), nameof(property)),
+                indexProperties, entityType, property);
+
+        /// <summary>
         ///     The specified index properties {indexProperties} are not declared on the entity type '{entityType}'. Ensure that index properties are declared on the target entity type.
         /// </summary>
         public static string IndexPropertiesWrongEntity(object? indexProperties, object? entityType)
@@ -2032,6 +2064,22 @@ namespace Microsoft.EntityFrameworkCore.Diagnostics
             => string.Format(
                 GetString("KeylessTypeWithKey", nameof(keyProperties), nameof(entityType)),
                 keyProperties, entityType);
+
+        /// <summary>
+        ///     The key {keyProperties} on the entity type '{entityType}' cannot be configured because it traverses the complex collection '{property}'. Keys cannot reference properties whose path goes through a complex collection.
+        /// </summary>
+        public static string KeyOnComplexCollection(object? keyProperties, object? entityType, object? property)
+            => string.Format(
+                GetString("KeyOnComplexCollection", nameof(keyProperties), nameof(entityType), nameof(property)),
+                keyProperties, entityType, property);
+
+        /// <summary>
+        ///     The key {keyProperties} on the entity type '{entityType}' cannot be configured because the complex property '{property}' it traverses is configured as optional. Mark the complex property as required in order to use one of its properties as part of a key.
+        /// </summary>
+        public static string KeyOnNullableComplexProperty(object? keyProperties, object? entityType, object? property)
+            => string.Format(
+                GetString("KeyOnNullableComplexProperty", nameof(keyProperties), nameof(entityType), nameof(property)),
+                keyProperties, entityType, property);
 
         /// <summary>
         ///     The specified key properties {keyProperties} are not declared on the entity type '{entityType}'. Ensure key properties are declared on the target entity type.

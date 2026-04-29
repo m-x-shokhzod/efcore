@@ -2118,7 +2118,7 @@ public class CSharpRuntimeModelCodeGenerator : ICompiledModelCodeGenerator
             .Append("var ").Append(variableName).Append(" = ").Append(parameters.TargetName).AppendLine(".AddIndex(")
             .IncrementIndent();
 
-        FindProperties(parameters.TargetName, index.Properties, mainBuilder, nullable, parameters.ScopeVariables);
+        FindPropertyBases(parameters.TargetName, index.Properties, mainBuilder, nullable, parameters.ScopeVariables);
 
         if (index.Name != null)
         {
@@ -2144,6 +2144,88 @@ public class CSharpRuntimeModelCodeGenerator : ICompiledModelCodeGenerator
             parameters with { TargetName = variableName });
 
         mainBuilder.AppendLine();
+    }
+
+    private void FindPropertyBases(
+        string entityTypeVariable,
+        IEnumerable<IPropertyBase> properties,
+        IndentedStringBuilder mainBuilder,
+        bool nullable,
+        IDictionary<object, string>? scopeVariables = null)
+    {
+        mainBuilder.Append("new[] { ");
+        var first = true;
+        foreach (var property in properties)
+        {
+            if (first)
+            {
+                first = false;
+            }
+            else
+            {
+                mainBuilder.Append(", ");
+            }
+
+            if (scopeVariables != null
+                && scopeVariables.TryGetValue(property, out var propertyVariable))
+            {
+                mainBuilder.Append(propertyVariable);
+            }
+            else if (property.DeclaringType is IEntityType)
+            {
+                mainBuilder
+                    .Append(entityTypeVariable)
+                    .Append(property is IComplexProperty ? ".FindComplexProperty(" : ".FindProperty(")
+                    .Append(_code.Literal(property.Name))
+                    .Append(')');
+
+                if (nullable)
+                {
+                    mainBuilder
+                        .Append('!');
+                }
+            }
+            else
+            {
+                // Property is declared on a complex type. Walk the chain from the entity type down to the
+                // complex type, then look up the leaf property/complex property.
+                var chain = new List<string>();
+                var typeBase = (IReadOnlyTypeBase)property.DeclaringType;
+                while (typeBase is IReadOnlyComplexType complexType)
+                {
+                    chain.Insert(0, complexType.ComplexProperty.Name);
+                    typeBase = complexType.ComplexProperty.DeclaringType;
+                }
+
+                mainBuilder.Append(entityTypeVariable);
+                foreach (var complexPropertyName in chain)
+                {
+                    mainBuilder
+                        .Append(".FindComplexProperty(")
+                        .Append(_code.Literal(complexPropertyName))
+                        .Append(')');
+
+                    if (nullable)
+                    {
+                        mainBuilder.Append('!');
+                    }
+
+                    mainBuilder.Append(".ComplexType");
+                }
+
+                mainBuilder
+                    .Append(property is IComplexProperty ? ".FindComplexProperty(" : ".FindProperty(")
+                    .Append(_code.Literal(property.Name))
+                    .Append(')');
+
+                if (nullable)
+                {
+                    mainBuilder.Append('!');
+                }
+            }
+        }
+
+        mainBuilder.Append(" }");
     }
 
     private void CreateComplexProperty(

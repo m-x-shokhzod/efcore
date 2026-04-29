@@ -33,7 +33,7 @@ public class Index : ConventionAnnotatable, IMutableIndex, IConventionIndex, IIn
     ///     doing so can result in application failures when updating to a new Entity Framework Core release.
     /// </summary>
     public Index(
-        IReadOnlyList<Property> properties,
+        IReadOnlyList<PropertyBase> properties,
         EntityType declaringEntityType,
         ConfigurationSource configurationSource)
     {
@@ -48,8 +48,11 @@ public class Index : ConventionAnnotatable, IMutableIndex, IConventionIndex, IIn
                 }
             }
 
-            if (declaringEntityType.FindProperty(property.Name) != property
-                || !property.IsInModel)
+            if ((property.DeclaringType is EntityType
+                    ? declaringEntityType.FindProperty(property.Name) != property
+                        && declaringEntityType.FindComplexProperty(property.Name) != property
+                    : property.DeclaringType.ContainingEntityType != declaringEntityType)
+                || !IsPropertyBaseInModel(property))
             {
                 throw new InvalidOperationException(CoreStrings.IndexPropertiesWrongEntity(properties.Format(), declaringEntityType.DisplayName()));
             }
@@ -62,6 +65,14 @@ public class Index : ConventionAnnotatable, IMutableIndex, IConventionIndex, IIn
         _builder = new InternalIndexBuilder(this, declaringEntityType.Model.Builder);
     }
 
+    private static bool IsPropertyBaseInModel(PropertyBase property)
+        => property switch
+        {
+            Property p => p.IsInModel,
+            ComplexProperty cp => cp.IsInModel,
+            _ => false
+        };
+
     /// <summary>
     ///     This is an internal API that supports the Entity Framework Core infrastructure and not subject to
     ///     the same compatibility standards as public APIs. It may be changed or removed without notice in
@@ -69,7 +80,7 @@ public class Index : ConventionAnnotatable, IMutableIndex, IConventionIndex, IIn
     ///     doing so can result in application failures when updating to a new Entity Framework Core release.
     /// </summary>
     public Index(
-        IReadOnlyList<Property> properties,
+        IReadOnlyList<PropertyBase> properties,
         string name,
         EntityType declaringEntityType,
         ConfigurationSource configurationSource)
@@ -82,7 +93,7 @@ public class Index : ConventionAnnotatable, IMutableIndex, IConventionIndex, IIn
     ///     any release. You should only use it directly in your code with extreme caution and knowing that
     ///     doing so can result in application failures when updating to a new Entity Framework Core release.
     /// </summary>
-    public virtual IReadOnlyList<Property> Properties { [DebuggerStepThrough] get; }
+    public virtual IReadOnlyList<PropertyBase> Properties { [DebuggerStepThrough] get; }
 
     /// <summary>
     ///     This is an internal API that supports the Entity Framework Core infrastructure and not subject to
@@ -317,7 +328,7 @@ public class Index : ConventionAnnotatable, IMutableIndex, IConventionIndex, IIn
             ref _nullableValueFactory, this, static index =>
             {
                 index.EnsureReadOnly();
-                return new CompositeValueFactory(index.Properties);
+                return new CompositeValueFactory(index.Properties.OfType<IProperty>().ToList());
             });
 
     /// <summary>
@@ -356,7 +367,7 @@ public class Index : ConventionAnnotatable, IMutableIndex, IConventionIndex, IIn
     ///     any release. You should only use it directly in your code with extreme caution and knowing that
     ///     doing so can result in application failures when updating to a new Entity Framework Core release.
     /// </summary>
-    IReadOnlyList<IReadOnlyProperty> IReadOnlyIndex.Properties
+    IReadOnlyList<IReadOnlyPropertyBase> IReadOnlyIndex.Properties
     {
         [DebuggerStepThrough]
         get => Properties;
@@ -380,7 +391,7 @@ public class Index : ConventionAnnotatable, IMutableIndex, IConventionIndex, IIn
     ///     any release. You should only use it directly in your code with extreme caution and knowing that
     ///     doing so can result in application failures when updating to a new Entity Framework Core release.
     /// </summary>
-    IReadOnlyList<IMutableProperty> IMutableIndex.Properties
+    IReadOnlyList<IMutablePropertyBase> IMutableIndex.Properties
     {
         [DebuggerStepThrough]
         get => Properties;
@@ -428,7 +439,7 @@ public class Index : ConventionAnnotatable, IMutableIndex, IConventionIndex, IIn
     ///     any release. You should only use it directly in your code with extreme caution and knowing that
     ///     doing so can result in application failures when updating to a new Entity Framework Core release.
     /// </summary>
-    IReadOnlyList<IConventionProperty> IConventionIndex.Properties
+    IReadOnlyList<IConventionPropertyBase> IConventionIndex.Properties
     {
         [DebuggerStepThrough]
         get => Properties;
@@ -440,7 +451,7 @@ public class Index : ConventionAnnotatable, IMutableIndex, IConventionIndex, IIn
     ///     any release. You should only use it directly in your code with extreme caution and knowing that
     ///     doing so can result in application failures when updating to a new Entity Framework Core release.
     /// </summary>
-    IReadOnlyList<IProperty> IIndex.Properties
+    IReadOnlyList<IPropertyBase> IIndex.Properties
     {
         [DebuggerStepThrough]
         get => Properties;

@@ -3639,6 +3639,61 @@ namespace Microsoft.EntityFrameworkCore.Metadata
             Assert.NotNull(storeFunction.FindColumn("addresses"));
         }
 
+        [ConditionalFact]
+        public void Alternate_key_on_complex_property_is_mapped_to_unique_constraint()
+        {
+            var modelBuilder = CreateConventionModelBuilder();
+            modelBuilder.Ignore<OrderDetails>();
+            modelBuilder.Ignore<DateDetails>();
+            modelBuilder.Ignore<Customer>();
+            modelBuilder.Ignore<Address>();
+            modelBuilder.Entity<Order>(b =>
+            {
+                b.HasAlternateKey("ComplexProperty.Value");
+            });
+
+            var model = Finalize(modelBuilder);
+            var orderType = model.Model.FindEntityType(typeof(Order))!;
+            var table = orderType.GetTableMappings().Single().Table;
+            var expectedColumnName = nameof(Order.ComplexProperty) + "_" + nameof(ComplexData.Value);
+
+            var alternateKey = orderType.GetKeys().Single(k => !k.IsPrimaryKey());
+            var uniqueConstraints = (SortedSet<Microsoft.EntityFrameworkCore.Metadata.Internal.UniqueConstraint>)alternateKey
+                .FindRuntimeAnnotationValue(RelationalAnnotationNames.UniqueConstraintMappings)!;
+            var uniqueConstraint = Assert.Single(uniqueConstraints);
+            var column = Assert.Single(uniqueConstraint.Columns);
+            Assert.Equal(expectedColumnName, column.Name);
+            Assert.Same(table, column.Table);
+        }
+
+        [ConditionalFact]
+        public void Index_on_complex_property_is_mapped_to_table_index()
+        {
+            var modelBuilder = CreateConventionModelBuilder();
+            modelBuilder.Ignore<OrderDetails>();
+            modelBuilder.Ignore<DateDetails>();
+            modelBuilder.Ignore<Customer>();
+            modelBuilder.Ignore<Address>();
+            modelBuilder.Entity<Order>(b =>
+            {
+                b.HasIndex("ComplexProperty.Number").IsUnique();
+            });
+
+            var model = Finalize(modelBuilder);
+            var orderType = model.Model.FindEntityType(typeof(Order))!;
+            var table = orderType.GetTableMappings().Single().Table;
+            var expectedColumnName = nameof(Order.ComplexProperty) + "_" + nameof(ComplexData.Number);
+
+            var index = orderType.GetIndexes().Single();
+            var tableIndexes = (SortedSet<TableIndex>)index
+                .FindRuntimeAnnotationValue(RelationalAnnotationNames.TableIndexMappings)!;
+            var tableIndex = Assert.Single(tableIndexes);
+            Assert.True(tableIndex.IsUnique);
+            var column = Assert.Single(tableIndex.Columns);
+            Assert.Equal(expectedColumnName, column.Name);
+            Assert.Same(table, column.Table);
+        }
+
         private static IRelationalModel Finalize(TestHelpers.TestModelBuilder modelBuilder)
             => modelBuilder.FinalizeModel(designTime: true).GetRelationalModel();
 

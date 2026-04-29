@@ -10,8 +10,8 @@ namespace Microsoft.EntityFrameworkCore.Metadata.Internal;
 ///     doing so can result in application failures when updating to a new Entity Framework Core release.
 /// </summary>
 // Sealed for perf
-public sealed class PropertyListComparer : IComparer<IReadOnlyList<IReadOnlyProperty>>,
-    IEqualityComparer<IReadOnlyList<IReadOnlyProperty>>
+public sealed class PropertyListComparer : IComparer<IReadOnlyList<IReadOnlyPropertyBase>>,
+    IEqualityComparer<IReadOnlyList<IReadOnlyPropertyBase>>
 {
     /// <summary>
     ///     This is an internal API that supports the Entity Framework Core infrastructure and not subject to
@@ -31,7 +31,7 @@ public sealed class PropertyListComparer : IComparer<IReadOnlyList<IReadOnlyProp
     ///     any release. You should only use it directly in your code with extreme caution and knowing that
     ///     doing so can result in application failures when updating to a new Entity Framework Core release.
     /// </summary>
-    public int Compare(IReadOnlyList<IReadOnlyProperty>? x, IReadOnlyList<IReadOnlyProperty>? y)
+    public int Compare(IReadOnlyList<IReadOnlyPropertyBase>? x, IReadOnlyList<IReadOnlyPropertyBase>? y)
     {
         if (ReferenceEquals(x, y))
         {
@@ -71,7 +71,7 @@ public sealed class PropertyListComparer : IComparer<IReadOnlyList<IReadOnlyProp
     ///     any release. You should only use it directly in your code with extreme caution and knowing that
     ///     doing so can result in application failures when updating to a new Entity Framework Core release.
     /// </summary>
-    public bool Equals(IReadOnlyList<IReadOnlyProperty>? x, IReadOnlyList<IReadOnlyProperty>? y)
+    public bool Equals(IReadOnlyList<IReadOnlyPropertyBase>? x, IReadOnlyList<IReadOnlyPropertyBase>? y)
         => Compare(x, y) == 0;
 
     /// <summary>
@@ -80,7 +80,7 @@ public sealed class PropertyListComparer : IComparer<IReadOnlyList<IReadOnlyProp
     ///     any release. You should only use it directly in your code with extreme caution and knowing that
     ///     doing so can result in application failures when updating to a new Entity Framework Core release.
     /// </summary>
-    public int GetHashCode(IReadOnlyList<IReadOnlyProperty> obj)
+    public int GetHashCode(IReadOnlyList<IReadOnlyPropertyBase> obj)
     {
         var hash = new HashCode();
         for (var i = 0; i < obj.Count; i++)

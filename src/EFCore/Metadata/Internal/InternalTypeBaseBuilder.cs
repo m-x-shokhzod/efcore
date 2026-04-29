@@ -547,7 +547,11 @@ public abstract class InternalTypeBaseBuilder :
         for (var i = 0; i < propertyNames.Count; i++)
         {
             var propertyName = propertyNames[i];
-            var property = Metadata.FindProperty(propertyName);
+
+            var resolved = ResolveComplexChainByName(propertyName);
+            var typeBuilder = resolved.Builder;
+            var leafName = resolved.FinalName;
+            var property = typeBuilder.Metadata.FindProperty(leafName);
             if (property == null)
             {
                 var type = referencedProperties == null
@@ -561,11 +565,11 @@ public abstract class InternalTypeBaseBuilder :
                     return null;
                 }
 
-                var propertyBuilder = Property(
+                var propertyBuilder = typeBuilder.Property(
                     required
                         ? type
                         : type?.MakeNullable(),
-                    propertyName,
+                    leafName,
                     typeConfigurationSource: null,
                     configurationSource.Value);
 
@@ -637,6 +641,37 @@ public abstract class InternalTypeBaseBuilder :
     ///     any release. You should only use it directly in your code with extreme caution and knowing that
     ///     doing so can result in application failures when updating to a new Entity Framework Core release.
     /// </summary>
+    public virtual IReadOnlyList<Property>? GetOrCreateProperties(
+        IReadOnlyList<IReadOnlyList<MemberInfo>>? memberChains,
+        ConfigurationSource? configurationSource)
+    {
+        if (memberChains == null)
+        {
+            return null;
+        }
+
+        var list = new List<Property>(memberChains.Count);
+        foreach (var memberChain in memberChains)
+        {
+            var (ownerBuilder, finalMember) = ResolveComplexChain(memberChain);
+            var propertyBuilder = ownerBuilder.Property(finalMember, configurationSource);
+            if (propertyBuilder == null)
+            {
+                return null;
+            }
+
+            list.Add(propertyBuilder.Metadata);
+        }
+
+        return list;
+    }
+
+    /// <summary>
+    ///     This is an internal API that supports the Entity Framework Core infrastructure and not subject to
+    ///     the same compatibility standards as public APIs. It may be changed or removed without notice in
+    ///     any release. You should only use it directly in your code with extreme caution and knowing that
+    ///     doing so can result in application failures when updating to a new Entity Framework Core release.
+    /// </summary>
     public virtual IReadOnlyList<Property>? GetActualProperties(
         IReadOnlyList<Property>? properties,
         ConfigurationSource? configurationSource)
@@ -654,7 +689,10 @@ public abstract class InternalTypeBaseBuilder :
         for (var i = 0;; i++)
         {
             var property = properties[i];
-            if (!property.IsInModel || !property.DeclaringType.IsAssignableFrom(Metadata))
+            if (!property.IsInModel
+                || !(property.DeclaringType.IsAssignableFrom(Metadata)
+                    || (property.DeclaringType is ComplexType complexType
+                        && complexType.ContainingEntityType.IsAssignableFrom(Metadata))))
             {
                 break;
             }
@@ -670,9 +708,15 @@ public abstract class InternalTypeBaseBuilder :
         {
             var property = properties[i];
             var typeConfigurationSource = property.GetTypeConfigurationSource();
-            var builder = Property(
+            var typeBuilder = property.IsInModel
+                && property.DeclaringType is ComplexType ownerComplex
+                && ownerComplex.ContainingEntityType.IsAssignableFrom(Metadata)
+                    ? ownerComplex.Builder
+                    : this;
+
+            var builder = typeBuilder.Property(
                 typeConfigurationSource.Overrides(ConfigurationSource.DataAnnotation)
-                || (property.IsInModel && Metadata.IsAssignableFrom(property.DeclaringType))
+                || (property.IsInModel && typeBuilder.Metadata.IsAssignableFrom(property.DeclaringType))
                     ? property.ClrType
                     : null,
                 property.Name,
@@ -686,6 +730,108 @@ public abstract class InternalTypeBaseBuilder :
             }
 
             actualProperties[i] = builder.Metadata;
+        }
+
+        return actualProperties;
+    }
+
+    /// <summary>
+    ///     This is an internal API that supports the Entity Framework Core infrastructure and not subject to
+    ///     the same compatibility standards as public APIs. It may be changed or removed without notice in
+    ///     any release. You should only use it directly in your code with extreme caution and knowing that
+    ///     doing so can result in application failures when updating to a new Entity Framework Core release.
+    /// </summary>
+    public virtual IReadOnlyList<PropertyBase>? GetActualPropertyBases(
+        IReadOnlyList<PropertyBase>? properties,
+        ConfigurationSource? configurationSource)
+    {
+        if (properties == null)
+        {
+            return null;
+        }
+
+        if (properties.Count == 0)
+        {
+            return properties;
+        }
+
+        // Determine if we can short-circuit (all properties are still in model and on the right type).
+        var allValid = true;
+        foreach (var property in properties)
+        {
+            if (property is Property prop)
+            {
+                if (!prop.IsInModel
+                    || !(prop.DeclaringType.IsAssignableFrom(Metadata)
+                        || (prop.DeclaringType is ComplexType complexType
+                            && complexType.ContainingEntityType.IsAssignableFrom(Metadata))))
+                {
+                    allValid = false;
+                    break;
+                }
+            }
+            else if (property is ComplexProperty cp)
+            {
+                if (!cp.IsInModel
+                    || cp.DeclaringType != Metadata)
+                {
+                    allValid = false;
+                    break;
+                }
+            }
+            else
+            {
+                allValid = false;
+                break;
+            }
+        }
+
+        if (allValid)
+        {
+            return properties;
+        }
+
+        var actualProperties = new PropertyBase[properties.Count];
+        var primitiveSubset = new Property?[properties.Count];
+        var hasPrimitives = false;
+        for (var i = 0; i < properties.Count; i++)
+        {
+            if (properties[i] is Property p)
+            {
+                primitiveSubset[i] = p;
+                hasPrimitives = true;
+            }
+        }
+
+        if (hasPrimitives)
+        {
+            // Reuse the primitive resolver for primitives.
+            var primitives = primitiveSubset.OfType<Property>().ToList();
+            var resolved = GetActualProperties(primitives, configurationSource);
+            if (resolved == null)
+            {
+                return null;
+            }
+
+            var primitiveIdx = 0;
+            for (var i = 0; i < properties.Count; i++)
+            {
+                if (primitiveSubset[i] != null)
+                {
+                    actualProperties[i] = resolved[primitiveIdx++];
+                }
+                else
+                {
+                    actualProperties[i] = properties[i];
+                }
+            }
+        }
+        else
+        {
+            for (var i = 0; i < properties.Count; i++)
+            {
+                actualProperties[i] = properties[i];
+            }
         }
 
         return actualProperties;

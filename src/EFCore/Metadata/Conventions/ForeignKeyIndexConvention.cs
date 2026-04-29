@@ -367,12 +367,12 @@ public class ForeignKeyIndexConvention :
     /// <param name="coveringIndexUnique">Whether the existing index is unique.</param>
     /// <returns><see langword="true" /> if the existing index covers the given properties.</returns>
     protected virtual bool AreIndexedBy(
-        IReadOnlyList<IConventionProperty> properties,
+        IReadOnlyList<IConventionPropertyBase> properties,
         bool unique,
-        IReadOnlyList<IConventionProperty> coveringIndexProperties,
+        IReadOnlyList<IConventionPropertyBase> coveringIndexProperties,
         bool coveringIndexUnique)
         => (!unique && coveringIndexProperties.Select(p => p.Name).StartsWith(properties.Select(p => p.Name)))
-            || (unique && coveringIndexUnique && coveringIndexProperties.SequenceEqual(properties));
+            || (unique && coveringIndexUnique && coveringIndexProperties.Select(p => p.Name).SequenceEqual(properties.Select(p => p.Name)));
 
     private static void RemoveIndex(IConventionIndex index)
         => index.DeclaringEntityType.Builder.HasNoIndex(index);

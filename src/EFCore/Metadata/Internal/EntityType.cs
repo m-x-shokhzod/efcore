@@ -28,7 +28,7 @@ public class EntityType : TypeBase, IMutableEntityType, IConventionEntityType, I
     private readonly SortedDictionary<string, ServiceProperty> _serviceProperties
         = new(StringComparer.Ordinal);
 
-    private readonly SortedDictionary<IReadOnlyList<IReadOnlyProperty>, Index> _unnamedIndexes
+    private readonly SortedDictionary<IReadOnlyList<IReadOnlyPropertyBase>, Index> _unnamedIndexes
         = new(PropertyListComparer.Instance);
 
     private readonly SortedDictionary<string, Index> _namedIndexes
@@ -480,6 +480,18 @@ public class EntityType : TypeBase, IMutableEntityType, IConventionEntityType, I
         => (EntityType)((IReadOnlyTypeBase)this).GetRootType();
 
     /// <summary>
+    ///     This is an internal API that supports the Entity Framework Core infrastructure and not subject to
+    ///     the same compatibility standards as public APIs. It may be changed or removed without notice in
+    ///     any release. You should only use it directly in your code with extreme caution and knowing that
+    ///     doing so can result in application failures when updating to a new Entity Framework Core release.
+    /// </summary>
+    public override EntityType ContainingEntityType
+    {
+        [DebuggerStepThrough]
+        get => this;
+    }
+
+    /// <summary>
     ///     Runs the conventions when an annotation was set or removed.
     /// </summary>
     /// <param name="name">The key of the set annotation.</param>
@@ -741,7 +753,9 @@ public class EntityType : TypeBase, IMutableEntityType, IConventionEntityType, I
                 }
             }
 
-            if (FindProperty(property.Name) != property
+            if ((property.DeclaringType is EntityType
+                    ? FindProperty(property.Name) != property
+                    : property.DeclaringType.ContainingEntityType != this)
                 || !property.IsInModel)
             {
                 throw new InvalidOperationException(CoreStrings.KeyPropertiesWrongEntity(properties.Format(), DisplayName()));
@@ -1917,7 +1931,7 @@ public class EntityType : TypeBase, IMutableEntityType, IConventionEntityType, I
     ///     doing so can result in application failures when updating to a new Entity Framework Core release.
     /// </summary>
     public virtual Index? AddIndex(
-        IReadOnlyList<Property> properties,
+        IReadOnlyList<PropertyBase> properties,
         ConfigurationSource configurationSource)
     {
         Check.NotEmpty(properties);
@@ -1946,7 +1960,7 @@ public class EntityType : TypeBase, IMutableEntityType, IConventionEntityType, I
     ///     doing so can result in application failures when updating to a new Entity Framework Core release.
     /// </summary>
     public virtual Index? AddIndex(
-        IReadOnlyList<Property> properties,
+        IReadOnlyList<PropertyBase> properties,
         string name,
         ConfigurationSource configurationSource)
     {
@@ -1974,7 +1988,7 @@ public class EntityType : TypeBase, IMutableEntityType, IConventionEntityType, I
         return (Index?)Model.ConventionDispatcher.OnIndexAdded(index.Builder)?.Metadata;
     }
 
-    private static void UpdatePropertyIndexes(IReadOnlyList<Property> properties, Index index)
+    private static void UpdatePropertyIndexes(IReadOnlyList<PropertyBase> properties, Index index)
     {
         foreach (var property in properties)
         {
@@ -2005,6 +2019,20 @@ public class EntityType : TypeBase, IMutableEntityType, IConventionEntityType, I
     ///     doing so can result in application failures when updating to a new Entity Framework Core release.
     /// </summary>
     public virtual Index? FindIndex(IReadOnlyList<IReadOnlyProperty> properties)
+    {
+        Check.HasNoNulls(properties);
+        Check.NotEmpty(properties);
+
+        return FindDeclaredIndex(properties) ?? BaseType?.FindIndex(properties);
+    }
+
+    /// <summary>
+    ///     This is an internal API that supports the Entity Framework Core infrastructure and not subject to
+    ///     the same compatibility standards as public APIs. It may be changed or removed without notice in
+    ///     any release. You should only use it directly in your code with extreme caution and knowing that
+    ///     doing so can result in application failures when updating to a new Entity Framework Core release.
+    /// </summary>
+    public virtual Index? FindIndex(IReadOnlyList<IReadOnlyPropertyBase> properties)
     {
         Check.HasNoNulls(properties);
         Check.NotEmpty(properties);
@@ -2062,6 +2090,15 @@ public class EntityType : TypeBase, IMutableEntityType, IConventionEntityType, I
     ///     any release. You should only use it directly in your code with extreme caution and knowing that
     ///     doing so can result in application failures when updating to a new Entity Framework Core release.
     /// </summary>
+    public virtual Index? FindDeclaredIndex(IReadOnlyList<IReadOnlyPropertyBase> properties)
+        => _unnamedIndexes.GetValueOrDefault(Check.NotEmpty(properties));
+
+    /// <summary>
+    ///     This is an internal API that supports the Entity Framework Core infrastructure and not subject to
+    ///     the same compatibility standards as public APIs. It may be changed or removed without notice in
+    ///     any release. You should only use it directly in your code with extreme caution and knowing that
+    ///     doing so can result in application failures when updating to a new Entity Framework Core release.
+    /// </summary>
     public virtual Index? FindDeclaredIndex(string name)
         => _namedIndexes.GetValueOrDefault(Check.NotEmpty(name));
 
@@ -2072,6 +2109,18 @@ public class EntityType : TypeBase, IMutableEntityType, IConventionEntityType, I
     ///     doing so can result in application failures when updating to a new Entity Framework Core release.
     /// </summary>
     public virtual IEnumerable<Index> FindDerivedIndexes(IReadOnlyList<IReadOnlyProperty> properties)
+        => DirectlyDerivedTypes.Count == 0
+            ? []
+            : (IEnumerable<Index>)GetDerivedTypes<EntityType>()
+                .Select(et => et.FindDeclaredIndex(properties)).Where(i => i != null);
+
+    /// <summary>
+    ///     This is an internal API that supports the Entity Framework Core infrastructure and not subject to
+    ///     the same compatibility standards as public APIs. It may be changed or removed without notice in
+    ///     any release. You should only use it directly in your code with extreme caution and knowing that
+    ///     doing so can result in application failures when updating to a new Entity Framework Core release.
+    /// </summary>
+    public virtual IEnumerable<Index> FindDerivedIndexes(IReadOnlyList<IReadOnlyPropertyBase> properties)
         => DirectlyDerivedTypes.Count == 0
             ? []
             : (IEnumerable<Index>)GetDerivedTypes<EntityType>()
@@ -2107,6 +2156,17 @@ public class EntityType : TypeBase, IMutableEntityType, IConventionEntityType, I
     ///     any release. You should only use it directly in your code with extreme caution and knowing that
     ///     doing so can result in application failures when updating to a new Entity Framework Core release.
     /// </summary>
+    public virtual IEnumerable<Index> FindIndexesInHierarchy(IReadOnlyList<IReadOnlyPropertyBase> properties)
+        => DirectlyDerivedTypes.Count == 0
+            ? ToEnumerable(FindIndex(properties))
+            : ToEnumerable(FindIndex(properties)).Concat(FindDerivedIndexes(properties));
+
+    /// <summary>
+    ///     This is an internal API that supports the Entity Framework Core infrastructure and not subject to
+    ///     the same compatibility standards as public APIs. It may be changed or removed without notice in
+    ///     any release. You should only use it directly in your code with extreme caution and knowing that
+    ///     doing so can result in application failures when updating to a new Entity Framework Core release.
+    /// </summary>
     public virtual IEnumerable<Index> FindIndexesInHierarchy(string name)
         => DirectlyDerivedTypes.Count == 0
             ? ToEnumerable(FindIndex(Check.NotEmpty(name)))
@@ -2118,7 +2178,7 @@ public class EntityType : TypeBase, IMutableEntityType, IConventionEntityType, I
     ///     any release. You should only use it directly in your code with extreme caution and knowing that
     ///     doing so can result in application failures when updating to a new Entity Framework Core release.
     /// </summary>
-    public virtual Index? RemoveIndex(IReadOnlyList<IReadOnlyProperty> properties)
+    public virtual Index? RemoveIndex(IReadOnlyList<IReadOnlyPropertyBase> properties)
     {
         Check.NotEmpty(properties);
 

@@ -1223,6 +1223,8 @@ namespace TestNamespace
                             cb.Ignore(e => e.Deriveds);
                         });
                 });
+
+            eb.HasIndex(e => new { e.Id, e.Owned.Number }, "IX_PrincipalBase_Id_Owned_Number");
         });
 
         modelBuilder.Entity<PrincipalDerived<DependentBase<byte?>>>(eb =>
@@ -1309,6 +1311,12 @@ namespace TestNamespace
         var nestedComplexType = nestedComplexProperty.ComplexType;
 
         Assert.Equal(ExpectedComplexTypeProperties, nestedComplexType.GetProperties().Count());
+
+        var index = principalBase.GetIndexes().Single(i => i.Name == "IX_PrincipalBase_Id_Owned_Number");
+        Assert.Equal("IX_PrincipalBase_Id_Owned_Number", index.Name);
+        Assert.Equal(2, index.Properties.Count);
+        Assert.Same(principalBase.FindProperty(nameof(PrincipalBase.Id)), index.Properties[0]);
+        Assert.Same(complexType.FindProperty(nameof(OwnedType.Number)), index.Properties[1]);
 
         var principalDerived = model.FindEntityType(typeof(PrincipalDerived<DependentBase<byte?>>));
         if (principalDerived == null)

@@ -2670,7 +2670,47 @@ public class RelationalModelValidator(
     {
         base.ValidateIndex(index, logger);
 
+        ValidateIndexComplexPropertyChainTableMapping(index);
+
         ValidateIndexMappedToTable(index, logger);
+    }
+
+    private static void ValidateIndexComplexPropertyChainTableMapping(IIndex index)
+    {
+        var entityTable = index.DeclaringEntityType.GetTableName();
+        if (entityTable == null)
+        {
+            return;
+        }
+
+        var entitySchema = index.DeclaringEntityType.GetSchema();
+
+        foreach (var propertyBase in index.Properties)
+        {
+            for (var declaringType = propertyBase.DeclaringType;
+                 declaringType is IComplexType complexType;
+                 declaringType = complexType.ComplexProperty.DeclaringType)
+            {
+                var complexTable = complexType.GetTableName();
+                if (complexTable == null)
+                {
+                    continue;
+                }
+
+                var complexSchema = complexType.GetSchema();
+
+                if (complexTable != entityTable || complexSchema != entitySchema)
+                {
+                    throw new InvalidOperationException(
+                        RelationalStrings.IndexOnComplexPropertyMappedToDifferentTable(
+                            index.Properties.Format(),
+                            index.DeclaringEntityType.DisplayName(),
+                            complexType.ComplexProperty.Name,
+                            (complexSchema == null ? "" : complexSchema + ".") + complexTable,
+                            (entitySchema == null ? "" : entitySchema + ".") + entityTable));
+                }
+            }
+        }
     }
 
     /// <summary>
@@ -2710,8 +2750,13 @@ public class RelationalModelValidator(
         (string, List<StoreObjectIdentifier>)? firstPropertyTables = null;
         (string, List<StoreObjectIdentifier>)? lastPropertyTables = null;
         HashSet<StoreObjectIdentifier>? overlappingTables = null;
-        foreach (var property in index.Properties)
+        foreach (var propertyBase in index.Properties)
         {
+            if (propertyBase is not IReadOnlyProperty property)
+            {
+                continue;
+            }
+
             var tablesMappedToProperty = property.GetMappedStoreObjects(StoreObjectType.Table).ToList();
             if (tablesMappedToProperty.Count == 0)
             {

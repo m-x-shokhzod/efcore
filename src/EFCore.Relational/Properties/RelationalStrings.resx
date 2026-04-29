@@ -511,6 +511,9 @@
   <data name="IncorrectDefaultValueType" xml:space="preserve">
     <value>Default value '{value}' of type '{valueType}' cannot be set on property '{property}' of type '{propertyType}' in entity type '{entityType}'.</value>
   </data>
+  <data name="IndexOnComplexPropertyMappedToDifferentTable" xml:space="preserve">
+    <value>The index {indexProperties} on the entity type '{entityType}' cannot be configured because the complex property '{complexProperty}' it traverses is mapped to a different table '{complexTable}' than the entity's table '{entityTable}'. Indexes can only reference complex properties that are mapped to the same table as the declaring entity type.</value>
+  </data>
   <data name="InsertDataOperationNoModel" xml:space="preserve">
     <value>The data insertion operation on '{table}' is not associated with a model. Either add a model to the migration, or specify the column types in all data operations.</value>
   </data>

@@ -85,7 +85,7 @@ public class InternalIndexBuilder : AnnotatableBuilder<Index, InternalModelBuild
     /// </summary>
     public virtual InternalIndexBuilder? Attach(InternalEntityTypeBuilder entityTypeBuilder)
     {
-        var properties = entityTypeBuilder.GetActualProperties(Metadata.Properties, null);
+        var properties = entityTypeBuilder.GetActualPropertyBases(Metadata.Properties, null);
         if (properties == null)
         {
             return null;

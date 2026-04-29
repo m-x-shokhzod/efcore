@@ -260,6 +260,48 @@ public class ModelValidator(ModelValidatorDependencies dependencies) : IModelVal
         IIndex index,
         IDiagnosticsLogger<DbLoggerCategory.Model.Validation> logger)
     {
+        foreach (var property in index.Properties)
+        {
+            if (property is IComplexProperty complexProperty)
+            {
+                if (complexProperty.IsCollection)
+                {
+                    throw new InvalidOperationException(
+                        CoreStrings.IndexOnComplexCollection(
+                            index.Properties.Format(),
+                            index.DeclaringEntityType.DisplayName(),
+                            complexProperty.Name));
+                }
+
+                if (index.Properties.Count > 1)
+                {
+                    throw new InvalidOperationException(
+                        CoreStrings.CompositeIndexOnComplexProperty(
+                            index.Properties.Format(),
+                            index.DeclaringEntityType.DisplayName(),
+                            complexProperty.Name));
+                }
+            }
+            else if (property is not IProperty)
+            {
+                throw new InvalidOperationException(
+                    CoreStrings.IndexPropertyMustBePropertyOrComplexProperty(
+                        property.Name,
+                        index.DeclaringEntityType.DisplayName()));
+            }
+
+            if (property.DeclaringType is not IComplexType)
+            {
+                continue;
+            }
+
+            ValidateComplexPropertyChainForKeyOrIndex(
+                property,
+                static (props, type, propName) => CoreStrings.IndexOnComplexCollection(props, type, propName),
+                static (props, type, propName) => CoreStrings.IndexOnNullableComplexProperty(props, type, propName),
+                index.Properties.Format(),
+                index.DeclaringEntityType.DisplayName());
+        }
     }
 
     /// <summary>
@@ -273,6 +315,49 @@ public class ModelValidator(ModelValidatorDependencies dependencies) : IModelVal
     {
         ValidateShadowKey(key, logger);
         ValidateMutableKey(key, logger);
+
+        foreach (var property in key.Properties)
+        {
+            if (property.DeclaringType is not IComplexType)
+            {
+                continue;
+            }
+
+            ValidateComplexPropertyChainForKeyOrIndex(
+                property,
+                static (props, type, propName) => CoreStrings.KeyOnComplexCollection(props, type, propName),
+                static (props, type, propName) => CoreStrings.KeyOnNullableComplexProperty(props, type, propName),
+                key.Properties.Format(),
+                key.DeclaringEntityType.DisplayName());
+        }
+    }
+
+    private static void ValidateComplexPropertyChainForKeyOrIndex(
+        IPropertyBase property,
+        Func<string, string, string, string> collectionErrorFactory,
+        Func<string, string, string, string> nullableErrorFactory,
+        string propertyListFormatted,
+        string entityTypeName)
+    {
+        var typeBase = property.DeclaringType;
+        while (typeBase is IComplexType complexType)
+        {
+            var complexProperty = complexType.ComplexProperty;
+
+            if (complexProperty.IsCollection)
+            {
+                throw new InvalidOperationException(
+                    collectionErrorFactory(propertyListFormatted, entityTypeName, complexProperty.Name));
+            }
+
+            if (complexProperty.IsNullable)
+            {
+                throw new InvalidOperationException(
+                    nullableErrorFactory(propertyListFormatted, entityTypeName, complexProperty.Name));
+            }
+
+            typeBase = complexProperty.DeclaringType;
+        }
     }
 
     /// <summary>

@@ -1305,6 +1305,50 @@ public partial class ModelValidatorTest : ModelValidatorTestBase
     }
 
     [ConditionalFact]
+    public virtual void Detects_key_traversing_nullable_complex_property()
+    {
+        var modelBuilder = CreateConventionModelBuilder();
+        modelBuilder.Entity<SampleEntity>(b =>
+        {
+            b.HasKey(e => e.Id);
+            b.Ignore(e => e.OtherSamples);
+            b.Ignore(e => e.AnotherReferencedEntity);
+            b.Ignore(e => e.Name);
+            b.Ignore(e => e.Number);
+            b.ComplexProperty(e => e.ReferencedEntity);
+            b.HasAlternateKey("ReferencedEntity.SampleEntityId");
+            b.ComplexProperty(e => e.ReferencedEntity).IsRequired(false);
+        });
+
+        VerifyError(
+            CoreStrings.KeyOnNullableComplexProperty(
+                "{'SampleEntityId'}", nameof(SampleEntity), nameof(SampleEntity.ReferencedEntity)),
+            modelBuilder);
+    }
+
+    [ConditionalFact]
+    public virtual void Detects_index_traversing_nullable_complex_property()
+    {
+        var modelBuilder = CreateConventionModelBuilder();
+        modelBuilder.Entity<SampleEntity>(b =>
+        {
+            b.HasKey(e => e.Id);
+            b.Ignore(e => e.OtherSamples);
+            b.Ignore(e => e.AnotherReferencedEntity);
+            b.Ignore(e => e.Name);
+            b.Ignore(e => e.Number);
+            b.ComplexProperty(e => e.ReferencedEntity);
+            b.HasIndex("ReferencedEntity.SampleEntityId");
+            b.ComplexProperty(e => e.ReferencedEntity).IsRequired(false);
+        });
+
+        VerifyError(
+            CoreStrings.IndexOnNullableComplexProperty(
+                "{'SampleEntityId'}", nameof(SampleEntity), nameof(SampleEntity.ReferencedEntity)),
+            modelBuilder);
+    }
+
+    [ConditionalFact]
     public virtual void Passes_on_valid_owned_entity_types()
     {
         var builder = CreateConventionlessModelBuilder();

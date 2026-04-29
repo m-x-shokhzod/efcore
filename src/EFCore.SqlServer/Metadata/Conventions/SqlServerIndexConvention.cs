@@ -206,8 +206,13 @@ public class SqlServerIndexConvention :
 
         var nullableColumns = new List<string>();
         var table = StoreObjectIdentifier.Table(tableName, index.DeclaringEntityType.GetSchema());
-        foreach (var property in index.Properties)
+        foreach (var propertyBase in index.Properties)
         {
+            if (propertyBase is not IReadOnlyProperty property)
+            {
+                continue;
+            }
+
             var columnName = property.GetColumnName(table);
             if (columnName == null)
             {

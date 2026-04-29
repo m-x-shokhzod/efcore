@@ -23,8 +23,8 @@ public static class RelationalIndexExtensions
         in StoreObjectIdentifier storeObject,
         bool shouldThrow)
     {
-        var columnNames = index.Properties.GetColumnNames(storeObject);
-        var duplicateColumnNames = duplicateIndex.Properties.GetColumnNames(storeObject);
+        var columnNames = index.Properties.OfType<IReadOnlyProperty>().ToList().GetColumnNames(storeObject);
+        var duplicateColumnNames = duplicateIndex.Properties.OfType<IReadOnlyProperty>().ToList().GetColumnNames(storeObject);
         if (columnNames == null
             || duplicateColumnNames == null)
         {
@@ -56,8 +56,8 @@ public static class RelationalIndexExtensions
                         duplicateIndex.DeclaringEntityType.DisplayName(),
                         index.DeclaringEntityType.GetSchemaQualifiedTableName(),
                         index.GetDatabaseName(storeObject),
-                        index.Properties.FormatColumns(storeObject),
-                        duplicateIndex.Properties.FormatColumns(storeObject)));
+                        index.Properties.OfType<IReadOnlyProperty>().ToList().FormatColumns(storeObject),
+                        duplicateIndex.Properties.OfType<IReadOnlyProperty>().ToList().FormatColumns(storeObject)));
             }
 
             return false;
